@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add Driver</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f7f7f7;
+        }
+
+        .form-container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            width: 400px;
+        }
+
+        h2 {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        input[type="text"],
+        input[type="password"] {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        button {
+            width: 100%;
+            padding: 10px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        .message {
+            text-align: center;
+            margin-top: 10px;
+        }
+
+        .success {
+            color: green;
+        }
+
+        .error {
+            color: red;
+        }
+    </style>
+</head>
+<body>
+    <div class="form-container">
+        <h2>Add Driver</h2>
+        <form id="add-driver-form">
+            <input type="text" id="driver-id" placeholder="Driver ID" required><br>
+            <input type="password" id="driver-password" placeholder="Password" required><br>
+            <button type="submit">Add Driver</button>
+        </form>
+        <div class="message" id="message"></div>
+    </div>
+
+    <script>
+        // Select form and message div
+        const form = document.getElementById('add-driver-form');
+        const messageDiv = document.getElementById('message');
+    
+        // Add event listener to handle form submission
+        form.addEventListener('submit', async function (event) {
+            event.preventDefault(); // Prevent default form submission
+    
+            // Get form values
+            const driverId = document.getElementById('driver-id').value.trim();
+            const password = document.getElementById('driver-password').value.trim();
+    
+            // Clear previous messages
+            messageDiv.textContent = '';
+            messageDiv.className = '';
+    
+            // Validate input
+            if (!driverId || !password) {
+                messageDiv.textContent = 'Driver ID and password are required.';
+                messageDiv.className = 'message error';
+                return;
+            }
+    
+            try {
+    const response = await fetch('http://localhost:3000/add-driver', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ driverid: driverId, password: password }),
+    });
+
+    if (response.ok) {
+        const data = await response.json();
+        messageDiv.textContent = data.message || 'Driver added successfully!';
+        messageDiv.className = 'message success';
+        form.reset();
+    } else {
+        const errorData = await response.json();
+        messageDiv.textContent = errorData.message || 'Error adding driver.';
+        messageDiv.className = 'message error';
+        console.error('Backend error:', errorData.error); // Log error details
+    }
+} catch (error) {
+    messageDiv.textContent = 'An error occurred. Please try again.';
+    messageDiv.className = 'message error';
+    console.error('Frontend error:', error); // Log error details
+}
+
+        });
+    </script>
+
+</body>
+</html>
