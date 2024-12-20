@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Driver Location Tracker</title>
+    <script src="https://cdn.socket.io/4.5.3/socket.io.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f4f4f4;
+        }
+
+        .message-box {
+            background-color: #fff;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            width: 90%;
+            max-width: 400px;
+        }
+
+        .message-box h1 {
+            font-size: 1.5em;
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .message-box p {
+            font-size: 1em;
+            margin-bottom: 20px;
+            color: #666;
+        }
+
+        .back-button {
+            display: inline-block;
+            background-color: #f53333;
+            color: #fff;
+            padding: 10px 20px;
+            text-decoration: none;
+            border-radius: 5px;
+            font-size: 1em;
+            transition: background-color 0.3s;
+        }
+
+        .back-button:hover {
+            background-color: #f16868;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="message-box">
+        <h1>Driver Location Tracker</h1>
+        <p>Currently you are Sharing your location...(Dont leave this page while sharing)</p>
+        <a href="javascript:history.back()" class="back-button">Stop</a>
+    </div>
+
+    <script>
+        const socket = io('http://localhost:3000'); // Connect to backend
+
+        // Get the driver ID from the URL query parameter (or use a login system to dynamically set this)
+        const urlParams = new URLSearchParams(window.location.search);
+        const driverId = urlParams.get('id'); // Assumes the driver ID is passed as a URL parameter
+
+        if (!driverId) {
+            alert('Driver ID is missing in the URL.');
+            window.location.href = '/login.html'; // Redirect to login page or error page
+        }
+
+        if (!navigator.geolocation) {
+            alert("Geolocation is not supported by your browser.");
+        } else {
+            // Continuously update the driver's location every 5 seconds
+            setInterval(() => {
+                navigator.geolocation.getCurrentPosition((position) => {
+                    const lat = position.coords.latitude;
+                    const long = position.coords.longitude;
+
+                    // Send location to the server
+                    socket.emit('updateLocation', { driverId, lat, long });
+                    console.log("Location sent:", { lat, long });
+                }, (error) => {
+                    console.error("Error getting location:", error);
+                });
+            }, 5000); // send location for every 5 minutes.
+        }
+        
+    </script>
+</body>
+
+</html>
