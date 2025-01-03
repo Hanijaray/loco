@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="initial-scale=1.0">
+    <title>Default Map</title>
+    <style>
+        html, body, #map {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100vh;
+        }
+    </style>
+
+    <!-- Mappls SDK JavaScript -->
+    <script src="https://apis.mappls.com/advancedmaps/api/js?key=08dd125aaaf28a4dd01d92c4879c7b92&callback=initMap" defer async></script>
+</head>
+<body>
+    <div id="map"></div>
+
+    <script>
+        var map;
+        function initMap() {
+            // Initialize the Map with the correct center and zoom level
+            map = new mappls.Map('map', {
+                center: [28.638698386592438, 77.27604556863412], // Default coordinates (Delhi)
+                zoom: 15, // Set zoom level
+                layer: 'vector' // Set map layer
+            });
+
+            //Optionally, you can add a marker to the location
+            var marker = new mappls.Marker({
+                position: [28.638698386592438, 77.27604556863412], // Coordinates for the marker
+                map: map
+            });
+        }
+    </script>
+
+</body>
+</html>
