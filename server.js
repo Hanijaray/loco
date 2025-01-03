@@ -10,7 +10,7 @@ const server = http.createServer(app);
 // Socket.io configuration with CORS to allow communication with the client
 const io = new Server(server, {
     cors: {
-        origin: ["https://loco-zc5a.onrender.com"], // Allow both origins
+        origin: ["https://dazzling-babka-c7886c.netlify.app"], // Allow both origins
         methods: ["GET", "POST"], // Allowed methods
     }
 });
