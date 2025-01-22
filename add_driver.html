@@ -102,7 +102,7 @@
             }
     
             try {
-    const response = await fetch('http://localhost:3000/add-driver', {
+    const response = await fetch('https://loco-zc5a.onrender.com/add-driver', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ driverid: driverId, password: password }),
