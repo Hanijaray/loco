@@ -2,76 +2,93 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Track Driver Location</title>
-
-    <!-- Leaflet CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
-
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-        }
-
-        #map {
-            width: 100%;
-            height: 100vh;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Track Driver Location</title>
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+    }
+    #map {
+      width: 100%;
+      height: 100vh;
+    }
+  </style>
 </head>
 
 <body>
-    <div id="map"></div>
+  <div id="map"></div>
 
-    <!-- Leaflet JS -->
-    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+  <!-- Socket.io JS -->
+  <script src="https://cdn.socket.io/4.5.3/socket.io.min.js"></script>
 
-    <!-- Socket.io JS -->
-    <script src="https://cdn.socket.io/4.5.3/socket.io.min.js"></script>
-
-    <script>
-        // Initialize map and set initial zoom
-        var map = L.map('map').setView([12.9716, 77.5946], 6);
-
-
-        // Add OSM layer
-        var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        });
-        osm.addTo(map);
-
-        // Initialize Socket.io client
-        const socket = io('https://loco-zc5a.onrender.com');
-
-        // Get the driverId from the URL parameters
-        const urlParams = new URLSearchParams(window.location.search);
-        const driverId = urlParams.get('driverId');
-
-        // Object to store drivers' markers
-        let driverMarkers = {};
-
-        // Handle receiving location updates for multiple drivers
-        socket.on('locationUpdate', (drivers) => {
-            // Check if the location update belongs to the selected driver
-            if (drivers[driverId]) {
-                const { lat, long } = drivers[driverId];
-                console.log(`${driverId} Location: Lat: ${lat}, Long: ${long}`);
-
-                // If the driver already has a marker, update it
-                if (driverMarkers[driverId]) {
-                    driverMarkers[driverId].setLatLng([lat, long]); // Update position
-                } else {
-                    // If no marker exists for this driver, create one
-                    driverMarkers[driverId] = L.marker([lat, long])
-                        .addTo(map)
-                        .bindPopup(driverId)
-                        .openPopup();
-                }
-            }
-        });
-    </script>
+  <script>
+    // Initialize map and set initial zoom
+    var map = L.map('map').setView([12.9716, 77.5946], 6);
+  
+    // Add OSM layer
+    var osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    });
+    osm.addTo(map);
+  
+    // Initialize Socket.io client
+    const socket = io('https://loco-zc5a.onrender.com');
+  
+    // Get the driverId from the URL parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const driverId = urlParams.get('driverId');
+  
+    if (!driverId) {
+      alert('Driver ID is missing in the URL.');
+    }
+  
+    // Object to store drivers' markers
+    let driverMarkers = {};
+  
+    // Function to update a driver's marker popup with distance info
+    function updateDriverMarker(driverId, lat, long, totalDistance) {
+      totalDistance = (totalDistance === undefined || totalDistance === null) ? 0 : totalDistance;
+      const kmDisplay = totalDistance.toFixed(2);
+      const mDisplay = (totalDistance * 1000).toFixed(0);
+      const popupContent = `<strong>${driverId}</strong><br/>Distance Covered: ${kmDisplay} km (${mDisplay} m)`;
+  
+      if (driverMarkers[driverId]) {
+        driverMarkers[driverId].setLatLng([lat, long]);
+        driverMarkers[driverId].setPopupContent(popupContent);
+        driverMarkers[driverId].openPopup();
+      } else {
+        driverMarkers[driverId] = L.marker([lat, long])
+          .addTo(map)
+          .bindPopup(popupContent)
+          .openPopup();
+      }
+    }
+  
+    // Handle receiving location updates for multiple drivers
+    socket.on('locationUpdate', (drivers) => {
+      console.log("Received location updates:", drivers);
+  
+      // Check if the requested driver exists in the updates
+      if (drivers.hasOwnProperty(driverId)) {
+        const { lat, long, totalDistance } = drivers[driverId];
+        console.log(`${driverId} Location: Lat: ${lat}, Long: ${long}, Distance: ${totalDistance} km`);
+        updateDriverMarker(driverId, lat, long, totalDistance);
+        map.setView([lat, long], 15);
+      } else {
+        // If driver does not exist in updates, show "Driver not logged in" message
+        alert(`Driver ${driverId} is not logged in or not sharing their location.`);
+      }
+    });
+  </script>
+  
 </body>
-
 </html>
+
+
+         
