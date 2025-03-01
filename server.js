@@ -1,3 +1,4 @@
+
 const express = require('express');
 const http = require('http');
 const sqlite3 = require('sqlite3').verbose();
@@ -26,18 +27,42 @@ const db = new sqlite3.Database('./location.db', (err) => {
         console.log('Connected to SQLite database.');
         db.run(`
             CREATE TABLE IF NOT EXISTS drivers (
-                id INTEGER PRIMARY KEY AUTOINCREMENT, 
-                driverid TEXT, 
-                password TEXT
+              id INTEGER PRIMARY KEY AUTOINCREMENT, 
+              driverid TEXT, 
+              password TEXT
             )
-        `, (err) => {
-            if (err) {
-                console.error('Error creating drivers table:', err.message);
-            }
-        });
-    }
+          `);
+          db.run(`
+            CREATE TABLE IF NOT EXISTS driver_reports (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              driver_id TEXT NOT NULL,
+              latitude REAL NOT NULL,
+              longitude REAL NOT NULL,
+              work_description TEXT,
+              report_date DATE NOT NULL
+            )
+          `);
+          db.run(`
+            CREATE TABLE IF NOT EXISTS driver_distance (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              driver_id TEXT,
+              distance REAL,
+              start_time TEXT,
+              end_time TEXT
+            )
+          `);
+        }
+      });
+ 
+app.get('/dri', (req, res) => {
+    const query = 'SELECT DISTINCT driver_id FROM driver_reports';
+    db.all(query, [], (err, rows) => {
+        if (err) {
+            return res.status(500).json({ message: 'Error fetching drivers.', error: err.message });
+        }
+        res.json(rows); // Respond with a list of drivers (driver_id)
+    });
 });
-
 app.get('/drivers', (req, res) => {
     const query = `SELECT driverid FROM drivers`;
     db.all(query, [], (err, rows) => {
@@ -91,35 +116,110 @@ app.post('/login', (req, res) => {
     });
 });
 
-let drivers = {}; // Object to store driver locations
+
+/// API endpoint for submitting a report
+app.post('/submit-report', (req, res) => {
+    const { driver_id, latitude, longitude, work_description } = req.body;
+
+    if (!driver_id || !latitude || !longitude) {
+        return res.status(400).json({ message: 'Driver ID, latitude, and longitude are required.' });
+    }
+
+    const report_date = new Date().toISOString(); // Current timestamp
+    const query = `
+        INSERT INTO driver_reports (driver_id, latitude, longitude, work_description, report_date)
+        VALUES (?, ?, ?, ?, ?)
+    `;
+
+    db.run(query, [driver_id, latitude, longitude, work_description, report_date], function (err) {
+        if (err) {
+            return res.status(500).json({ message: 'Error saving report.', error: err.message });
+        }
+        res.status(200).json({ message: 'Report submitted successfully.', report_id: this.lastID });
+    });
+});
+
+
+// API endpoint to fetch all reports (for debugging or admin view)
+app.get('/reports', (req, res) => {
+    db.all('SELECT * FROM driver_reports', [], (err, rows) => {
+        if (err) {
+            return res.status(500).json({ message: 'Error fetching reports.', error: err.message });
+        }
+
+        // Update drivers object with the latest locations
+        rows.forEach((report) => {
+            if (report.driver_id && report.latitude && report.longitude) {
+                drivers[report.driver_id] = {
+                    latitude: report.latitude,
+                    longitude: report.longitude,
+                };
+            }
+        });
+
+        res.json(rows);
+    });
+});
+app.get('/driver-reports/:driverId', (req, res) => {
+    const driverId = req.params.driverId;
+    const query = 'SELECT * FROM driver_reports WHERE driver_id = ? ORDER BY report_date DESC';
+    db.all(query, [driverId], (err, rows) => {
+        if (err) {
+            return res.status(500).json({ message: 'Error fetching reports.', error: err.message });
+        }
+        res.json(rows); // Respond with the reports for the selected driver
+    });
+});
+
+
+
+     
+// In-memory object to store driver states (location and distance)
+let drivers = {};
 
 // Socket.io connection handling
 io.on('connection', (socket) => {
-    console.log('A user connected:', socket.id);
+console.log('A user connected:', socket.id);
 
-    // Listen for location updates from drivers
-    socket.on('updateLocation', ({ driverId, lat, long }) => {
-        console.log(`Received location update from ${driverId}:`, { lat, long });
+// Listen for location updates from drivers
+socket.on('updateLocation', ({ driverId, lat, long, totalDistance }) => {
+  console.log(`Received location update from ${driverId}:`, { lat, long, totalDistance });
+  // Save driverId on the socket for disconnect handling
+  socket.driverId = driverId;
 
-        // Update or add the driver's location in the `drivers` object
-        drivers[driverId] = { lat, long };
+  // Update or initialize the driver's state
+  drivers[driverId] = {
+    lat,
+    long,
+    totalDistance, // this value is coming from your client (already calculated)
+    startTime: drivers[driverId] ? drivers[driverId].startTime : new Date().toISOString()
+  };
 
-        // Broadcast the updated driver locations to all connected clients
-        io.emit('locationUpdate', drivers);
+  // Broadcast updated driver states to all clients
+  io.emit('locationUpdate', drivers);
+});
 
-        console.log('Broadcasting updated locations:', drivers);
+// When a driver disconnects, store their distance info in the database
+socket.on('disconnect', () => {
+  console.log('A user disconnected:', socket.id);
+  if (socket.driverId && drivers[socket.driverId]) {
+    const { totalDistance, startTime } = drivers[socket.driverId];
+    const endTime = new Date().toISOString();
+    const query = `
+      INSERT INTO driver_distance (driver_id, distance, start_time, end_time)
+      VALUES (?, ?, ?, ?)
+    `;
+    db.run(query, [socket.driverId, totalDistance, startTime, endTime], function(err) {
+      if (err) {
+        console.error('Error storing driver distance:', err.message);
+      } else {
+        console.log(`Stored distance for driver ${socket.driverId}: ${totalDistance} km`);
+      }
     });
-
-    // Handle disconnects (optional: cleanup driver info when a driver disconnects)
-    socket.on('disconnect', () => {
-        console.log('A user disconnected:', socket.id);
-
-        // Optionally, remove the driver from the `drivers` object when disconnected
-        // If needed, you can use socket.id to identify the driver.
-        // Delete drivers[socket.id];
-
-        io.emit('locationUpdate', drivers); // Re-broadcast the updated drivers list
-    });
+    delete drivers[socket.driverId];
+    io.emit('locationUpdate', drivers);
+  }
+});
 });
 
 // Start the server
