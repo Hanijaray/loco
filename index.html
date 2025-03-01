@@ -3,31 +3,84 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Location Tracker.</title>
+    <title>Driver List</title>
     <style>
         body {
             font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f8f9fa;
+        }
+
+        /* Stylish Header */
+        header {
+            background-color: #007bff;
+            padding: 15px 0;
             text-align: center;
-            margin: 20px;
         }
-        #driver-buttons {
+
+        .nav-pills {
             display: flex;
-            flex-direction: column;
-            align-items: center;
-            margin-top: 20px;
+            justify-content: center;
+            padding: 0;
+            list-style: none;
         }
-        button {
-            margin: 10px 0;
-            padding: 10px 20px;
+
+        .nav-pills li {
+            margin: 0 15px;
+        }
+
+        .nav-pills a {
+            text-decoration: none;
+            color: white;
             font-size: 16px;
-            cursor: pointer;
+            padding: 10px 15px;
+            border-radius: 5px;
+            transition: background 0.3s;
+        }
+
+        .nav-pills a:hover, .nav-pills .active {
+            background-color: #0056b3;
+        }
+
+        /* Table Styling */
+        .driver-table {
+            width: 80%;
+            margin: 30px auto;
+            border-collapse: collapse;
+            background: white;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .driver-table th, .driver-table td {
+            padding: 12px;
+            text-align: center;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .driver-table th {
+            background: #007bff;
+            color: white;
+        }
+
+        .driver-table tr:hover {
+            background-color: #f1f1f1;
+        }
+
+        /* Buttons */
+        .view-btn {
             background-color: rgb(54, 180, 81);
             color: white;
+            padding: 8px 15px;
             border: none;
             border-radius: 5px;
-            transition: background-color 0.3s ease;
+            cursor: pointer;
+            transition: background 0.3s;
         }
-        button:hover {
+
+        .view-btn:hover {
             background-color: rgb(44, 150, 70);
         }
     </style>
@@ -35,42 +88,79 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@3.3.7/dist/css/bootstrap.min.css">
 </head>
 <body>
-    <div class="container">
-        <header class="d-flex justify-content-center py-3">
-            <ul class="nav nav-pills">
-                <li class="nav-item"><a href="home.html" class="nav-link active" aria-current="page">Home</a></li>
-                <li class="nav-item"><a href="login.html" class="nav-link">Driver Login</a></li>
-                <li class="nav-item"><a href="add_driver.html" class="nav-link">Add Driver</a></li>
-            </ul>
-        </header>
-    </div>
-    <h1>View Driver Location</h1>
-    <div id="driver-buttons"></div>
+
+    <!-- Header -->
+    <header>
+        <ul class="nav nav-pills">
+            <li class="nav-item"><a href="home.html" class="active">Home</a></li>
+            <li class="nav-item"><a href="login.html">Driver Login</a></li>
+            <li class="nav-item"><a href="add_driver.html">Add Driver</a></li>
+            <li class="nav-item"><a href="view_report.html">See Report</a></li>
+        </ul>
+    </header>
+
+    <!-- Main Content -->
+    <h1 style="text-align: center; margin-top: 20px;">View Driver Location</h1>
+
+    <!-- Driver Table -->
+    <table class="driver-table">
+        <thead>
+            <tr>
+                <th>S.No</th>
+                <th>Driver ID</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody id="driver-table-body">
+            <!-- Dynamic rows will be added here -->
+        </tbody>
+    </table>
 
     <script>
-        // Hardcoded driver IDs
-        const drivers = [
-            { driverid: "driver1" },
-            { driverid: "driver2" },
-            { driverid: "driver3" }
-        ];
+        // Fetch driver IDs from the backend
+        fetch('https://loco-zc5a.onrender.com/drivers')
+            .then(response => response.json())
+            .then(drivers => {
+                const tableBody = document.getElementById('driver-table-body');
+                
+                drivers.forEach((driver, index) => {
+                    // Create a table row
+                    const row = document.createElement('tr');
 
-        const buttonsContainer = document.getElementById('driver-buttons');
+                    // Serial number column
+                    const serialNumberCell = document.createElement('td');
+                    serialNumberCell.textContent = index + 1;
 
-        // Create buttons for each driver
-        drivers.forEach(driver => {
-            const button = document.createElement('button');
-            button.textContent = driver.driverid;
-            button.onclick = () => selectDriver(driver.driverid);
-            buttonsContainer.appendChild(button);
-        });
+                    // Driver ID column
+                    const driverIdCell = document.createElement('td');
+                    driverIdCell.textContent = driver.driverid;
 
+                    // Action button column
+                    const actionCell = document.createElement('td');
+                    const button = document.createElement('button');
+                    button.textContent = "View Location";
+                    button.classList.add("view-btn");
+                    button.onclick = () => selectDriver(driver.driverid);
+                    actionCell.appendChild(button);
+
+                    // Append cells to row
+                    row.appendChild(serialNumberCell);
+                    row.appendChild(driverIdCell);
+                    row.appendChild(actionCell);
+
+                    // Append row to table
+                    tableBody.appendChild(row);
+                });
+            })
+            .catch(error => console.error('Error fetching drivers:', error));
+
+        // Function to redirect to admin page with driver ID
         function selectDriver(driverId) {
-            // redirect to admin page with driver ID as a URL parameter
             window.location.href = `admin.html?driverId=${driverId}`;
         }
-    
     </script>
-</body>
 
+</body>
 </html>
+
+
