@@ -1,100 +1,142 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Driver Location Tracker</title>
-    <script src="https://cdn.socket.io/4.5.3/socket.io.min.js"></script>
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            font-family: Arial, sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            background-color: #f4f4f4;
-        }
-
-        .message-box {
-            background-color: #fff;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-            border-radius: 8px;
-            padding: 20px;
-            text-align: center;
-            width: 90%;
-            max-width: 400px;
-        }
-
-        .message-box h1 {
-            font-size: 1.5em;
-            margin-bottom: 10px;
-            color: #333;
-        }
-
-        .message-box p {
-            font-size: 1em;
-            margin-bottom: 20px;
-            color: #666;
-        }
-
-        .back-button {
-            display: inline-block;
-            background-color: #f53333;
-            color: #fff;
-            padding: 10px 20px;
-            text-decoration: none;
-            border-radius: 5px;
-            font-size: 1em;
-            transition: background-color 0.3s;
-        }
-
-        .back-button:hover {
-            background-color: #f16868;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Driver Location Tracker</title>
+  <script src="https://cdn.socket.io/4.5.3/socket.io.min.js"></script>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      background-color: #f4f4f4;
+    }
+    .message-box {
+      background-color: #fff;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+      border-radius: 8px;
+      padding: 20px;
+      text-align: center;
+      width: 90%;
+      max-width: 400px;
+      margin-bottom: 20px;
+    }
+    .message-box h1 {
+      font-size: 1.5em;
+      margin-bottom: 10px;
+      color: #333;
+    }
+    .message-box p {
+      font-size: 1em;
+      margin-bottom: 20px;
+      color: #666;
+    }
+    .back-button {
+      display: inline-block;
+      background-color: #f53333;
+      color: #fff;
+      padding: 10px 20px;
+      text-decoration: none;
+      border-radius: 5px;
+      font-size: 1em;
+      transition: background-color 0.3s;
+    }
+    .back-button:hover {
+      background-color: #f16868;
+    }
+    #distance-info {
+      font-size: 1.1em;
+      margin-top: 10px;
+      color: #333;
+    }
+    #report-link {
+      margin-top: 15px;
+      color: #007bff;
+      text-decoration: none;
+      font-size: 1em;
+    }
+  </style>
 </head>
-
 <body>
-    <div class="message-box">
-        <h1>Driver Location Tracker</h1>
-        <p>Currently you are Sharing your location...(Dont leave this page while sharing)</p>
-        <a href="javascript:history.back()" class="back-button">Stop</a>
-    </div>
+  <div class="message-box">
+    <h1>Driver Location Tracker</h1>
+    <p>Currently you are sharing your location... (Don't leave this page while sharing)</p>
+    <a href="javascript:history.back()" class="back-button">Stop</a>
+    <div id="distance-info">Distance Covered: 0.00 km (0 m)</div>
+    <a id="report-link" href="#">Report</a>
+  </div>
 
-    <script>
-        const socket = io('https://loco-zc5a.onrender.com'); // Connect to backend
+  <script>
+    // Initialize Socket.io client
+    const socket = io('https://loco-zc5a.onrender.com'); // Ensure your Node.js server runs on this URL/port
 
-        // Get the driver ID from the URL query parameter (or use a login system to dynamically set this)
-        const urlParams = new URLSearchParams(window.location.search);
-        const driverId = urlParams.get('id'); // Assumes the driver ID is passed as a URL parameter
+    // Get the driver ID from the URL query parameter (e.g., ?id=123)
+    const urlParams = new URLSearchParams(window.location.search);
+    const driverId = urlParams.get('id');
 
-        if (!driverId) {
-            alert('Driver ID is missing in the URL.');
-            window.location.href = '/login.html'; // Redirect to login page or error page
+    if (!driverId) {
+      alert('Driver ID is missing in the URL.');
+      window.location.href = '/login.html';
+    } else {
+      // Update the report link dynamically
+      document.getElementById('report-link').href = "report.html?driver_id=" + encodeURIComponent(driverId);
+    }
+
+    // Variables to store previous location and total distance (in km)
+    let previousPosition = null;
+    let totalDistance = 0;
+
+    // Haversine formula to calculate distance between two coordinates (in km)
+    function calculateDistance(lat1, lon1, lat2, lon2) {
+      const R = 6371; // Radius of Earth in km
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c; // Distance in km
+    }
+
+    // Function to update the driver's location and calculate distance
+    function updateLocation() {
+      navigator.geolocation.getCurrentPosition((position) => {
+        const lat = position.coords.latitude;
+        const long = position.coords.longitude;
+
+        // If there's a previous position, calculate the distance traveled since then
+        if (previousPosition) {
+          const distance = calculateDistance(previousPosition.lat, previousPosition.long, lat, long);
+          totalDistance += distance;
         }
+        // Update previous position
+        previousPosition = { lat, long };
 
-        if (!navigator.geolocation) {
-            alert("Geolocation is not supported by your browser.");
-        } else {
-            // Continuously update the driver's location every 5 seconds
-            setInterval(() => {
-                navigator.geolocation.getCurrentPosition((position) => {
-                    const lat = position.coords.latitude;
-                    const long = position.coords.longitude;
+        // Format the distance in kilometers and meters
+        const displayDistanceKm = totalDistance.toFixed(2);
+        const displayDistanceM = (totalDistance * 1000).toFixed(0);
+        document.getElementById('distance-info').innerText = 'Distance Covered: ' + displayDistanceKm + ' km (' + displayDistanceM + ' m)';
 
-                    // Send location to the server
-                    socket.emit('updateLocation', { driverId, lat, long });
-                    console.log("Location sent:", { lat, long });
-                }, (error) => {
-                    console.error("Error getting location:", error);
-                });
-            }, 5000); // send location for every 5 minutes.
-        }
-        
-    </script>
+        // Send location update to the server along with totalDistance
+        socket.emit('updateLocation', { driverId, lat, long, totalDistance });
+        console.log("Location sent:", { lat, long, totalDistance });
+      }, (error) => {
+        console.error("Error getting location:", error);
+      });
+    }
+
+    // Continuously update the driver's location every 5 seconds
+    if (navigator.geolocation) {
+      setInterval(updateLocation, 5000);
+    } else {
+      alert("Geolocation is not supported by your browser.");
+    }
+  </script>
 </body>
-
 </html>
