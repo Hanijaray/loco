@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - View Driver Reports</title>
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+        #map {
+            width: 100%;
+            height: 70vh;
+            margin-bottom: 20px;
+        }
+        #report-list {
+            padding: 20px;
+        }
+        .report-item {
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .driver-list {
+            padding: 10px;
+            margin-bottom: 20px;
+        }
+        .driver-item {
+            cursor: pointer;
+            padding: 5px;
+            border: 1px solid #ccc;
+            margin: 5px;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Admin - Driver Reports</h1>
+    <div class="driver-list" id="driver-list">
+        <!-- Dynamic list of drivers will be populated here -->
+    </div>
+    <div id="map"></div>
+    <h2>Driver Reports</h2>
+    <div id="report-list"></div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script>
+        const map = L.map('map').setView([12.9716, 77.5946], 6); // Default Bangalore, India view
+
+        // Add OpenStreetMap layer
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        // Fetch list of all drivers
+        async function fetchDrivers() {
+            try {
+                const response = await fetch('http://localhost:3000/dri');
+                const drivers = await response.json();
+                const driverList = document.getElementById('driver-list');
+                driverList.innerHTML = ''; // Clear previous list
+
+                drivers.forEach(driver => {
+                    const driverItem = document.createElement('div');
+                    driverItem.classList.add('driver-item');
+                    driverItem.textContent = `Driver ID: ${driver.driver_id}`;
+                    driverItem.onclick = () => fetchReports(driver.driver_id);
+                    driverList.appendChild(driverItem);
+                });
+            } catch (error) {
+                alert('Error fetching drivers: ' + error.message);
+            }
+        }
+
+        // Fetch reports for a selected driver
+       // Fetch reports for a selected driver and display them on the map
+async function fetchReports(driverId) {
+    try {
+        const response = await fetch(`http://localhost:3000/driver-reports/${driverId}`);
+        const reports = await response.json();
+
+        // Clear existing markers and report list
+        map.eachLayer((layer) => {
+            if (layer instanceof L.Marker) {
+                map.removeLayer(layer);
+            }
+        });
+
+        const reportList = document.getElementById('report-list');
+        reportList.innerHTML = ''; // Clear previous report list
+
+        reports.forEach((report) => {
+            // Convert report date to IST
+            const reportDateUTC = new Date(report.report_date);
+            const reportDateIST = reportDateUTC.toLocaleString("en-IN", { timeZone: "Asia/Kolkata" });
+
+            // Add marker for each report
+            const marker = L.marker([report.latitude, report.longitude])
+                .addTo(map)
+                .bindPopup(`
+                    <strong>Driver ID:</strong> ${report.driver_id}<br>
+                    <strong>Work:</strong> ${report.work_description}<br>
+                    <strong>Date (IST):</strong> ${reportDateIST}
+                `);
+
+            // Create report item in the list
+            const reportItem = document.createElement('div');
+            reportItem.className = 'report-item';
+            reportItem.innerHTML = `
+                <strong>Driver ID:</strong> ${report.driver_id}<br>
+                <strong>Date (IST):</strong> ${reportDateIST}<br>
+                <strong>Work:</strong> ${report.work_description}<br>
+                <button onclick="showOnMap(${report.latitude}, ${report.longitude})">View on Map</button>
+            `;
+            reportList.appendChild(reportItem);
+        });
+
+        // Auto-zoom to the last reported location
+        if (reports.length > 0) {
+            const lastReport = reports[0];
+            map.setView([lastReport.latitude, lastReport.longitude], 15);
+        }
+    } catch (error) {
+        alert('Error fetching reports: ' + error.message);
+    }
+}
+        // convert UTC time to indian stanard time(Indian standard time)
+        // Convert UTC time to Indian Standard Time (IST)
+        function convertToIST(utcDateString) {
+            const utcDate = new Date(utcDateString);
+            return utcDate.toLocaleString("en-IN", { timeZone: "Asia/Kolkata" });
+        }
+
+        // Show a specific location on the map
+        function showOnMap(lat, lng) {
+            map.setView([lat, lng], 15);
+        }
+        
+        // Fetch all drivers when the page loads
+        fetchDrivers();
+    </script>
+
+</body>
+</html>
