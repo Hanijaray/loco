@@ -67,16 +67,14 @@
   <div class="message-box">
     <h1>Driver Location Tracker</h1>
     <p>Currently you are sharing your location... (Don't leave this page while sharing)</p>
-    <a href="javascript:history.back()" class="back-button">Stop</a>
+    <a href="javascript:stopTracking()" class="back-button">Stop</a>
     <div id="distance-info">Distance Covered: 0.00 km (0 m)</div>
     <a id="report-link" href="#">Report</a>
   </div>
 
   <script>
-    // Initialize Socket.io client
-    const socket = io('https://loco-zc5a.onrender.com'); // Ensure your Node.js server runs on this URL/port
+    const socket = io('http://localhost:3000'); // Ensure your Node.js server is running
 
-    // Get the driver ID from the URL query parameter (e.g., ?id=123)
     const urlParams = new URLSearchParams(window.location.search);
     const driverId = urlParams.get('id');
 
@@ -84,54 +82,51 @@
       alert('Driver ID is missing in the URL.');
       window.location.href = '/login.html';
     } else {
-      // Update the report link dynamically
       document.getElementById('report-link').href = "report.html?driver_id=" + encodeURIComponent(driverId);
     }
 
-    // Variables to store previous location and total distance (in km)
     let previousPosition = null;
-    let totalDistance = 0;
+    let totalDistance = parseFloat(localStorage.getItem(`totalDistance_${driverId}`)) || 0; // Load previous distance
 
-    // Haversine formula to calculate distance between two coordinates (in km)
     function calculateDistance(lat1, lon1, lat2, lon2) {
-      const R = 6371; // Radius of Earth in km
+      const R = 6371;
       const dLat = (lat2 - lat1) * Math.PI / 180;
       const dLon = (lon2 - lon1) * Math.PI / 180;
       const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
                 Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
                 Math.sin(dLon / 2) * Math.sin(dLon / 2);
       const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-      return R * c; // Distance in km
+      return R * c;
     }
 
-    // Function to update the driver's location and calculate distance
     function updateLocation() {
       navigator.geolocation.getCurrentPosition((position) => {
         const lat = position.coords.latitude;
         const long = position.coords.longitude;
 
-        // If there's a previous position, calculate the distance traveled since then
         if (previousPosition) {
           const distance = calculateDistance(previousPosition.lat, previousPosition.long, lat, long);
           totalDistance += distance;
+          localStorage.setItem(`totalDistance_${driverId}`, totalDistance); // Save to localStorage
         }
-        // Update previous position
+
         previousPosition = { lat, long };
 
-        // Format the distance in kilometers and meters
         const displayDistanceKm = totalDistance.toFixed(2);
         const displayDistanceM = (totalDistance * 1000).toFixed(0);
         document.getElementById('distance-info').innerText = 'Distance Covered: ' + displayDistanceKm + ' km (' + displayDistanceM + ' m)';
 
-        // Send location update to the server along with totalDistance
         socket.emit('updateLocation', { driverId, lat, long, totalDistance });
-        console.log("Location sent:", { lat, long, totalDistance });
       }, (error) => {
         console.error("Error getting location:", error);
       });
     }
 
-    // Continuously update the driver's location every 5 seconds
+    function stopTracking() {
+      localStorage.removeItem(`totalDistance_${driverId}`); // Clear saved distance
+      window.location.href = '/login.html'; // Redirect to login or stop page
+    }
+
     if (navigator.geolocation) {
       setInterval(updateLocation, 5000);
     } else {
